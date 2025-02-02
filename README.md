@@ -1,5 +1,7 @@
 # AI Orchestra 🎭
 
+![AI Orchestra](https://replicate.delivery/xezq/i34RlRAenhShMiJRCC3qt2eq2k43vIZmfcrToCu8KtGvV1WoA/tmp9q_4jc7w.jpg)
+
 A powerful state machine orchestrator for AI agents with streaming support. AI Orchestra helps you build complex AI workflows by managing state transitions, handling events, and processing AI streams seamlessly.
 
 [![npm version](https://badge.fury.io/js/ai-orchestra.svg)](https://badge.fury.io/js/ai-orchestra)
@@ -30,59 +32,11 @@ pnpm add ai-orchestra
 bun add ai-orchestra
 ```
 
-## Quick Start
+## Example
 
-Here's a simple example of how to use AI Orchestra:
+Here's how to use AI Orchestra with the Vercel AI SDK and tool handling:
 
-```typescript
-import { createOrchestra } from 'ai-orchestra'
-
-// Define your context type
-type Context = {
-  query: string
-  messages: string[]
-}
-
-// Create an orchestra instance with typed states and context
-const orchestra = createOrchestra<Context>()({
-  start: async (context, dispatch) => {
-    await dispatch('custom-event', { message: 'Starting analysis' })
-    return {
-      nextState: 'processing',
-      context: { ...context, messages: [...context.messages, 'Started'] },
-    }
-  },
-  processing: async (context) => {
-    // Process the query
-    return {
-      nextState: 'complete',
-      context: { ...context, messages: [...context.messages, 'Processed'] },
-    }
-  },
-  complete: async (context) => {
-    return {
-      context: { ...context, messages: [...context.messages, 'Completed'] },
-    }
-  },
-})
-
-// Create and run an instance
-const run = orchestra.createRun({
-  agent: 'start',
-  context: { query: 'What is AI?', messages: [] },
-})
-
-// Listen to events
-for await (const event of run.events) {
-  console.log('Event:', event)
-}
-```
-
-## Advanced Example with AI Integration
-
-Here's a more comprehensive example showing how to use AI Orchestra with the Vercel AI SDK and tool handling:
-
-```typescript
+````typescript
 import { anthropic } from '@ai-sdk/anthropic'
 import { CoreMessage, streamText } from 'ai'
 import { z } from 'zod'
@@ -203,116 +157,193 @@ for await (const event of run.events) {
 
 // Get the final state
 const finalState = run.history[run.history.length - 1]
-```
 
-This example demonstrates:
+## Streaming Custom Data
 
-- Integration with Anthropic's Claude model
-- Tool definition and handling
-- State transitions based on AI responses
-- Message history management
-- Event streaming and processing
+AI Orchestra supports streaming custom data alongside the model's response, which can be used with Vercel's `useChat` hook. This is useful for sending additional information like status updates, message IDs, or content references.
 
-## API Reference
-
-### `createOrchestra<TContext>()`
-
-Creates a new orchestra instance with typed context.
+Here's how you can dispatch custom data in your state handlers:
 
 ```typescript
-type Handler<TState, TContext> = (
-  context: TContext,
-  dispatch: Dispatch
-) => HandlerResult<TState, TContext> | Promise<HandlerResult<TState, TContext>>
-
-const orchestra = createOrchestra<TContext>()({
-  stateName: async (context, dispatch) => {
-    // Handle state logic
-    return {
-      nextState?: 'nextStateName',
-      context: { /* updated context */ }
-    }
-  }
-})
-```
-
-### Event Types
-
-The orchestra emits several types of events:
-
-```typescript
-type OrchestraEvent<TContext> =
-  | StateTransitionEvent<TContext>
-  | StateCompletionEvent<TContext>
-  | CustomEvent
-
-// State transition event
-{
-  event: 'on_state_transition'
-  from: string
-  to?: string
-  context: TContext
-}
-
-// State completion event
-{
-  event: 'on_state_completion'
-  state: string
-  context: TContext
-}
-
-// Custom event
-{
-  event: 'on_custom_event'
-  name: string
-  data: any
-}
-```
-
-### Stream Processing
-
-AI Orchestra provides utilities for handling AI streams:
-
-```typescript
-import { processStream } from 'ai-orchestra'
-
-const result = await processStream(aiStream, async (chunk) => {
-  // Handle stream chunks
-})
-```
-
-## Usage with AI Models
-
-AI Orchestra works seamlessly with various AI models. Here's an example using the Vercel AI SDK:
-
-```typescript
-import { streamText } from 'ai'
+import { anthropic } from '@ai-sdk/anthropic'
+import { CoreMessage, streamText } from 'ai'
+import { z } from 'zod'
 import { createOrchestra, processStream } from 'ai-orchestra'
 
-const orchestra = createOrchestra<Context>()({
+const orchestra = createOrchestra<MyContext>()({
   intent: async (context, dispatch) => {
-    const stream = streamText({
-      model: openai,
-      prompt: context.query,
+    // Dispatch custom data that will be available in useChat hook
+    await dispatch('ai-sdk-stream-chunk', {
+      type: 'data',
+      value: { status: 'initialized' },
     })
 
-    await processStream(stream, dispatch)
+    const chunks = streamText({
+      model: anthropic('claude-3-5-haiku-20241022'),
+      system: 'You are a helpful assistant',
+      messages: context.messages,
+      maxSteps: 10,
+    })
+
+    // Process the stream and handle tool calls
+    const { messages } = await processStream(chunks, async (chunk) => {
+      // You can dispatch data during stream processing
+      await dispatch('ai-sdk-stream-chunk', {
+        type: 'data',
+        value: { progress: 'processing chunk' },
+      })
+    })
+
+    // Dispatch completion data
+    await dispatch('ai-sdk-stream-chunk', {
+      type: 'data',
+      value: { status: 'completed' },
+    })
 
     return {
-      nextState: 'complete',
-      context,
+      context: {
+        messages: [...context.messages, ...messages],
+      },
     }
   },
 })
+````
+
+On the client side, you can access this data using the `useChat` hook:
+
+```typescript
+import { useChat } from 'ai/react'
+
+export default function Chat() {
+  const { messages, data, setData } = useChat()
+
+  return (
+    <div>
+      {/* Display streamed data */}
+      {data && <pre>{JSON.stringify(data, null, 2)}</pre>}
+
+      {/* Display messages */}
+      {messages.map((m) => (
+        <div key={m.id}>{m.content}</div>
+      ))}
+    </div>
+  )
+}
 ```
 
-## Best Practices
+The streamed data will be automatically available in the `data` property of the `useChat` hook, and you can use `setData` to manage this data manually if needed.
 
-1. **Type Your Context** - Always define types for your context to get the best TypeScript experience
-2. **Handle Errors** - Implement error handling in your state handlers
-3. **Keep States Focused** - Each state should have a single responsibility
-4. **Use Custom Events** - Leverage custom events for detailed progress tracking
-5. **Stream Processing** - Use the built-in stream processing utilities for AI responses
+## Using with Next.js
+
+AI Orchestra provides a helper function `orchestraToAIStream` to easily integrate with Next.js API routes. Here's how to use it:
+
+```typescript
+// app/api/chat/route.ts
+import { orchestraToAIStream } from 'ai-orchestra'
+import { anthropic } from '@ai-sdk/anthropic'
+import { streamText } from 'ai'
+import { z } from 'zod'
+import { createOrchestra } from 'ai-orchestra'
+
+export const runtime = 'edge'
+
+export async function POST(req: Request) {
+  const { messages } = await req.json()
+
+  const orchestra = createOrchestra<{ messages: any[] }>()({
+    chat: async (context, dispatch) => {
+      // You can dispatch status updates
+      await dispatch('ai-sdk-stream-chunk', {
+        type: 'data',
+        value: { status: 'started' },
+      })
+
+      const chunks = streamText({
+        model: anthropic('claude-3-5-haiku-20241022'),
+        messages: context.messages,
+        tools: {
+          search: {
+            description: 'Search for information',
+            parameters: z.object({
+              query: z.string().describe('Search query'),
+            }),
+          },
+        },
+      })
+
+      const { messages: responseMessages } = await processStream(
+        chunks,
+        dispatch
+      )
+
+      return {
+        context: {
+          messages: [...context.messages, ...responseMessages],
+        },
+      }
+    },
+  })
+
+  // Create a run instance
+  const run = await orchestra.createRun({
+    agent: 'chat',
+    context: { messages },
+  })
+
+  // Convert orchestra events to AI SDK stream
+  const aiStream = await orchestraToAIStream(run)
+
+  // Return the stream with proper headers
+  return new Response(aiStream, {
+    headers: {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      Connection: 'keep-alive',
+    },
+  })
+}
+```
+
+Then in your React component:
+
+```typescript
+'use client'
+
+import { useChat } from 'ai/react'
+
+export default function Chat() {
+  const { messages, input, handleInputChange, handleSubmit, data } = useChat()
+
+  return (
+    <div>
+      {/* Display stream status */}
+      {data && <div>Status: {data[data.length - 1]?.status}</div>}
+
+      {/* Display messages */}
+      {messages.map((m) => (
+        <div key={m.id}>{m.content}</div>
+      ))}
+
+      {/* Chat input */}
+      <form onSubmit={handleSubmit}>
+        <input
+          value={input}
+          onChange={handleInputChange}
+          placeholder="Say something..."
+        />
+      </form>
+    </div>
+  )
+}
+```
+
+The `orchestraToAIStream` function handles:
+
+- Converting orchestra events to AI SDK stream format
+- Streaming message chunks
+- Streaming custom data
+- Tool calls and responses
+- Error handling
 
 ## Contributing
 
