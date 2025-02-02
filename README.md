@@ -2,18 +2,18 @@
 
 ![AI Orchestra](https://replicate.delivery/xezq/i34RlRAenhShMiJRCC3qt2eq2k43vIZmfcrToCu8KtGvV1WoA/tmp9q_4jc7w.jpg)
 
-A powerful state machine orchestrator for AI agents with streaming support. AI Orchestra helps you build complex AI workflows by managing state transitions, handling events, and processing AI streams seamlessly.
+Simple orchestration for AI Agents built around Vercel's `streamText`. AI Orchestra provides a lightweight way to handle agent handoffs and state transitions, similar to OpenAI's Swarm but with more developer control and less magic. Think of it as a simpler alternative to LangGraph, focused on streaming and agent coordination.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## Features
 
-- 🎯 **State Machine Architecture** - Build complex AI workflows with clear state transitions
-- 🌊 **Streaming Support** - Native support for AI streaming responses
-- 🔄 **Event System** - Rich event system for state transitions and custom events
-- 📝 **TypeScript First** - Built with TypeScript for excellent type safety and IDE support
-- 🔌 **Framework Agnostic** - Works with any JavaScript/TypeScript project
-- 🚀 **Modern ESM** - Full ESM support with CommonJS compatibility
+- 🎯 **Simple Agent Handoffs** - Coordinate multiple AI agents with clear state transitions
+- 🌊 **Built for Streaming** - Native support for Vercel's `streamText` and AI SDK
+- 🔄 **Developer Control** - Full control over agent behavior and state transitions
+- 📝 **TypeScript First** - Built with TypeScript for excellent type safety
+- 🎭 **Swarm-like Patterns** - Similar patterns to OpenAI's Swarm, but more flexible
+- 🚀 **Minimal Dependencies** - Core dependencies are Vercel's `ai` package and `zod` for type safety
 
 ## Installation
 
