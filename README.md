@@ -35,7 +35,7 @@ bun add ai-orchestra
 
 Here's how to use AI Orchestra with the Vercel AI SDK and tool handling:
 
-````typescript
+```typescript
 import { anthropic } from '@ai-sdk/anthropic'
 import { CoreMessage, streamText } from 'ai'
 import { z } from 'zod'
@@ -156,6 +156,7 @@ for await (const event of run.events) {
 
 // Get the final state
 const finalState = run.history[run.history.length - 1]
+```
 
 ## Streaming Custom Data
 
@@ -206,7 +207,7 @@ const orchestra = createOrchestra<MyContext>()({
     }
   },
 })
-````
+```
 
 On the client side, you can access this data using the `useChat` hook:
 
