@@ -4,7 +4,6 @@
 
 A powerful state machine orchestrator for AI agents with streaming support. AI Orchestra helps you build complex AI workflows by managing state transitions, handling events, and processing AI streams seamlessly.
 
-[![npm version](https://badge.fury.io/js/ai-orchestra.svg)](https://badge.fury.io/js/ai-orchestra)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## Features
