@@ -1,0 +1,31 @@
+# Source
+lib/
+test/
+examples/
+
+# Development
+.github/
+.vscode/
+.env
+.env.*
+*.log
+.DS_Store
+
+# Build & test files
+coverage/
+tsconfig.json
+tsconfig.*.json
+vitest.config.ts
+
+# Development configs
+.eslintrc
+.prettierrc
+.editorconfig
+
+# Git
+.git/
+.gitignore
+
+# Misc
+node_modules/
+bun.lockb 

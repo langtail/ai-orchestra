@@ -163,6 +163,14 @@ const orchestra = createOrchestra<MyContext>()({
       model: anthropic('claude-3-5-haiku-20241022'),
       system: 'You are a helpful assistant that plans events',
       messages: context.messages,
+      tools: {
+        // Anthropic needs tools defined for any conversation with previous tool usage
+        // https://github.com/BerriAI/litellm/issues/5388
+        dummyTool: {
+          description: 'A dummy tool',
+          parameters: z.object({}),
+        },
+      },
     })
 
     const { messages } = await processStream(chunks, dispatch)
