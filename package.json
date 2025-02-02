@@ -1,0 +1,75 @@
+{
+  "name": "ai-orchestra",
+  "version": "0.1.0",
+  "description": "A state machine orchestrator for AI agents with streaming support",
+  "type": "module",
+  "main": "./dist/orchestra.js",
+  "module": "./dist/orchestra.js",
+  "types": "./dist/orchestra.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/orchestra.d.ts",
+      "import": "./dist/orchestra.js",
+      "require": "./dist/orchestra.js",
+      "default": "./dist/orchestra.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "bun run build:js && bun run build:types",
+    "build:js": "bun build ./lib/orchestra.ts --outdir ./dist --target node",
+    "build:types": "tsc",
+    "test": "vitest",
+    "test:watch": "vitest watch",
+    "test:coverage": "vitest run --coverage",
+    "typecheck": "tsc --noEmit",
+    "format": "bun prettier --write \"**/*.{ts,tsx,md,json}\"",
+    "clean": "rm -rf dist",
+    "prepublishOnly": "bun run build"
+  },
+  "keywords": [
+    "ai",
+    "state-machine",
+    "orchestrator",
+    "streaming",
+    "typescript",
+    "llm"
+  ],
+  "author": {
+    "name": "Petr Brzek"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/petrbrzek/ai-orchestra.git"
+  },
+  "bugs": {
+    "url": "https://github.com/petrbrzek/ai-orchestra/issues"
+  },
+  "homepage": "https://github.com/petrbrzek/ai-orchestra#readme",
+  "dependencies": {
+    "@ai-sdk/anthropic": "^1.1.6",
+    "@ai-sdk/openai": "latest",
+    "@ai-sdk/ui-utils": "latest",
+    "ai": "latest",
+    "langtail": "^0.13.9",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "bun-types": "latest",
+    "prettier": "^3.0.0",
+    "typescript": "^5.0.0",
+    "vitest": "^3.0.4"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
