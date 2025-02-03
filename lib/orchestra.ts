@@ -1,5 +1,4 @@
 import { CoreMessage, ToolResultPart, TextStreamPart } from 'ai'
-import { ReadableStream, TransformStream } from 'stream/web'
 import { formatDataStreamPart } from '@ai-sdk/ui-utils'
 
 export type HandlerResult<TState extends string, TContext> = {
@@ -79,6 +78,10 @@ export async function processStream(
     stream.response,
     (async () => {
       for await (const chunk of stream.fullStream) {
+        if (chunk.type === 'error') {
+          console.error('error', chunk.error)
+        }
+
         await dispatch('ai-sdk-stream-chunk', chunk)
 
         if (
@@ -196,7 +199,10 @@ export function createOrchestra<TContext>() {
   }
 }
 
-export function createToolResponse(toolCall: any, result: string): CoreMessage {
+export function createToolResponse(
+  toolCall: any,
+  result?: string
+): CoreMessage {
   return {
     role: 'tool',
     content: [
@@ -204,7 +210,7 @@ export function createToolResponse(toolCall: any, result: string): CoreMessage {
         type: 'tool-result',
         toolCallId: toolCall.toolCallId,
         toolName: toolCall.toolName,
-        result,
+        result: result ?? 'Done',
       },
     ],
   }

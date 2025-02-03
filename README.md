@@ -219,13 +219,22 @@ export default function Chat() {
 
   return (
     <div>
-      {/* Display streamed data */}
-      {data && <pre>{JSON.stringify(data, null, 2)}</pre>}
+      {/* Display stream status */}
+      {data && <div>Status: {data[data.length - 1]?.status}</div>}
 
       {/* Display messages */}
       {messages.map((m) => (
         <div key={m.id}>{m.content}</div>
       ))}
+
+      {/* Chat input */}
+      <form onSubmit={handleSubmit}>
+        <input
+          value={input}
+          onChange={handleInputChange}
+          placeholder="Say something..."
+        />
+      </form>
     </div>
   )
 }
@@ -239,11 +248,15 @@ AI Orchestra provides a helper function `orchestraToAIStream` to easily integrat
 
 ```typescript
 // app/api/chat/route.ts
-import { orchestraToAIStream } from 'ai-orchestra'
-import { anthropic } from '@ai-sdk/anthropic'
 import { streamText } from 'ai'
 import { z } from 'zod'
-import { createOrchestra } from 'ai-orchestra'
+import {
+  createOrchestra,
+  orchestraToAIStream,
+  processStream,
+  createToolResponse,
+} from 'ai-orchestra'
+import { openai } from '@ai-sdk/openai'
 
 export const runtime = 'edge'
 
@@ -259,16 +272,48 @@ export async function POST(req: Request) {
       })
 
       const chunks = streamText({
-        model: anthropic('claude-3-5-haiku-20241022'),
+        model: openai('gpt-4o'),
         messages: context.messages,
         tools: {
-          search: {
-            description: 'Search for information',
+          handoffToJokeAgent: {
+            description: 'Handoff to joke agent',
             parameters: z.object({
-              query: z.string().describe('Search query'),
+              query: z.string().describe('Joke query'),
             }),
           },
         },
+      })
+
+      const {
+        toolCalls,
+        finishReason,
+        messages: responseMessages,
+      } = await processStream(chunks, dispatch)
+
+      if (finishReason === 'tool-calls') {
+        for (const toolCall of toolCalls) {
+          if (toolCall.toolName === 'handoffToJokeAgent') {
+            return {
+              nextState: 'joke',
+              context: {
+                messages: [...responseMessages, createToolResponse(toolCall)],
+              },
+            }
+          }
+        }
+      }
+
+      return {
+        context: {
+          messages: [...context.messages, ...responseMessages],
+        },
+      }
+    },
+    joke: async (context, dispatch) => {
+      const chunks = streamText({
+        model: openai('gpt-4'),
+        system: 'You are a joke teller',
+        messages: context.messages,
       })
 
       const { messages: responseMessages } = await processStream(
@@ -277,9 +322,7 @@ export async function POST(req: Request) {
       )
 
       return {
-        context: {
-          messages: [...context.messages, ...responseMessages],
-        },
+        context: { messages: [...context.messages, ...responseMessages] },
       }
     },
   })
@@ -304,46 +347,80 @@ export async function POST(req: Request) {
 }
 ```
 
-Then in your React component:
+## Core Functions
+
+### `createOrchestra<TContext>()`
+
+Creates an orchestra instance that manages state transitions and context for AI agents.
 
 ```typescript
-'use client'
-
-import { useChat } from 'ai/react'
-
-export default function Chat() {
-  const { messages, input, handleInputChange, handleSubmit, data } = useChat()
-
-  return (
-    <div>
-      {/* Display stream status */}
-      {data && <div>Status: {data[data.length - 1]?.status}</div>}
-
-      {/* Display messages */}
-      {messages.map((m) => (
-        <div key={m.id}>{m.content}</div>
-      ))}
-
-      {/* Chat input */}
-      <form onSubmit={handleSubmit}>
-        <input
-          value={input}
-          onChange={handleInputChange}
-          placeholder="Say something..."
-        />
-      </form>
-    </div>
-  )
-}
+const orchestra = createOrchestra<{ messages: any[] }>()({
+  chat: async (context, dispatch) => {
+    // Your chat agent implementation
+    return {
+      nextState: 'nextAgent', // Optional, omit to end
+      context: {
+        /* updated context */
+      },
+    }
+  },
+  // More agents...
+})
 ```
 
-The `orchestraToAIStream` function handles:
+The function accepts a generic type parameter for your context and returns a factory that takes a record of handlers. Each handler is an async function that receives:
+
+- `context`: The current state context
+- `dispatch`: Function to emit events during processing
+
+### `processStream(stream, dispatch)`
+
+Processes a stream from `streamText` and handles tool calls, messages, and events.
+
+```typescript
+const { finishReason, toolCalls, messages } = await processStream(
+  chunks,
+  dispatch
+)
+```
+
+Returns:
+
+- `finishReason`: The reason the stream finished (e.g., 'tool-calls', 'stop')
+- `toolCalls`: Array of tool calls made during the stream
+- `messages`: Array of messages generated during the stream
+
+### `createToolResponse(toolCall, result?)`
+
+Creates a properly formatted tool response message for the AI SDK.
+
+```typescript
+const response = createToolResponse(toolCall, 'Optional result message')
+```
+
+Returns a `CoreMessage` with:
+
+- `role`: 'tool'
+- `content`: Array containing the tool result with toolCallId, toolName, and result
+
+### `orchestraToAIStream(run)`
+
+Converts an orchestra run into a ReadableStream compatible with the AI SDK.
+
+```typescript
+const run = await orchestra.createRun({
+  agent: 'chat',
+  context: { messages },
+})
+
+const aiStream = await orchestraToAIStream(run)
+```
+
+Handles:
 
 - Converting orchestra events to AI SDK stream format
-- Streaming message chunks
-- Streaming custom data
-- Tool calls and responses
-- Error handling
+- Formatting different types of chunks (text, tool calls, data, etc.)
+- Proper encoding and streaming of events
 
 ## Contributing
 
