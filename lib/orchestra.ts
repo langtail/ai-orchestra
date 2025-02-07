@@ -276,7 +276,9 @@ export async function orchestraToAIStream(
               break
 
             case 'step-start':
-              formattedData = formatDataStreamPart('start_step', chunk)
+              formattedData = formatDataStreamPart('start_step', {
+                messageId: chunk.messageId,
+              })
               break
 
             case 'step-finish':
