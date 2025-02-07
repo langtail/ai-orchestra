@@ -1,6 +1,6 @@
 {
   "name": "ai-orchestra",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "A state machine orchestrator for AI agents with streaming support",
   "type": "module",
   "main": "./dist/orchestra.js",
