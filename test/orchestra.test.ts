@@ -163,4 +163,67 @@ describe('Orchestra', () => {
       })
     )
   })
+
+  it('should call onFinish with final state when run completes', async () => {
+    type Context = {
+      count: number
+      message: string
+    }
+
+    const onFinish = vi.fn()
+    const startTime = Date.now()
+
+    const orchestra = createOrchestra<Context>()({
+      start: async (context) => {
+        return {
+          nextState: 'end',
+          context: { count: context.count + 1 },
+        }
+      },
+      end: async (context) => {
+        return {
+          context: { count: context.count + 1, message: 'Done' },
+        }
+      },
+    })
+
+    const run = orchestra.createRun({
+      agent: 'start',
+      context: { count: 0, message: '' },
+      onFinish,
+    })
+
+    // Consume all events
+    for await (const event of run.events) {
+      // Just consume the events
+    }
+
+    // Verify onFinish was called exactly once
+    expect(onFinish).toHaveBeenCalledTimes(1)
+
+    // Verify the final state passed to onFinish
+    expect(onFinish).toHaveBeenCalledWith({
+      agent: 'end',
+      context: {
+        count: 2,
+        message: 'Done',
+      },
+      timestamp: expect.any(Number),
+    })
+
+    // Verify timestamp is recent
+    const callArg = onFinish.mock.calls[0][0]
+    expect(callArg.timestamp).toBeGreaterThanOrEqual(startTime)
+    expect(callArg.timestamp).toBeLessThanOrEqual(Date.now())
+
+    // Verify history matches
+    expect(run.history).toHaveLength(3)
+    expect(run.history[run.history.length - 1]).toMatchObject({
+      agent: 'end',
+      context: {
+        count: 2,
+        message: 'Done',
+      },
+    })
+  })
 })

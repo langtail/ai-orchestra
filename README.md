@@ -35,7 +35,7 @@ bun add ai-orchestra
 
 Here's how to use AI Orchestra with the Vercel AI SDK and tool handling:
 
-```typescript
+````typescript
 import { anthropic } from '@ai-sdk/anthropic'
 import { CoreMessage, streamText } from 'ai'
 import { z } from 'zod'
@@ -156,7 +156,51 @@ for await (const event of run.events) {
 
 // Get the final state
 const finalState = run.history[run.history.length - 1]
-```
+
+## Run Completion Callback
+
+AI Orchestra provides an `onFinish` callback that is called when a run completes. This is useful for performing actions like saving the final state to a database or triggering follow-up processes.
+
+```typescript
+const run = await orchestra.createRun({
+  agent: 'intent',
+  context: {
+    messages: [
+      {
+        role: 'user',
+        content: 'Help me plan a party',
+      },
+    ],
+  },
+  onFinish: async (finalState) => {
+    // finalState contains:
+    // - agent: The name of the last agent that ran
+    // - context: The final context state
+    // - timestamp: When the run completed
+
+    await saveToDatabase({
+      lastAgent: finalState.agent,
+      finalContext: finalState.context,
+      completedAt: finalState.timestamp,
+    })
+  },
+})
+````
+
+The `onFinish` callback receives a `finalState` object containing:
+
+- `agent`: The name of the last agent that executed
+- `context`: The final context state after all transitions
+- `timestamp`: The timestamp when the run completed
+
+This callback is executed after all state transitions are complete and before the run's events are closed. It's a great place to:
+
+- Save results to a database
+- Trigger follow-up processes
+- Log completion metrics
+- Send notifications
+
+The callback is optional and non-blocking, meaning the stream will continue to work while the callback executes.
 
 ## Streaming Custom Data
 

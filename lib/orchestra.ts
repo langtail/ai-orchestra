@@ -104,14 +104,21 @@ export async function processStream(
   return { finishReason, toolCalls, messages: response.messages }
 }
 
+export type RunParams<TContext> = {
+  agent: string
+  context: TContext
+  onFinish?: (finalState: {
+    agent: string
+    context: TContext
+    timestamp: number
+  }) => void | Promise<void>
+}
+
 export function createOrchestra<TContext>() {
   return <const THandlers extends Record<PropertyKey, unknown>>(handlers: {
     [K in keyof THandlers]: Handler<Extract<keyof THandlers, string>, TContext>
   }) => {
-    const createRun = (params: {
-      agent: keyof typeof handlers | ''
-      context: TContext
-    }): OrchestraRun<TContext> => {
+    const createRun = (params: RunParams<TContext>): OrchestraRun<TContext> => {
       const history: Array<{
         agent: string
         context: TContext
@@ -170,20 +177,26 @@ export function createOrchestra<TContext>() {
             } as StateTransitionEvent<TContext>
           } else {
             // Update history with final context before emitting completion
-            history.push({
+            const finalState = {
               agent: String(currentAgent),
               context: currentContext,
               timestamp: Date.now(),
-            })
+            }
+            history.push(finalState)
 
             yield {
               event: 'on_state_completion',
               state: String(currentAgent),
               context: currentContext,
             } as StateCompletionEvent<TContext>
+
+            // Call onFinish callback if provided
+            if (params.onFinish) {
+              await params.onFinish(finalState)
+            }
           }
 
-          currentAgent = nextAgent
+          currentAgent = String(nextAgent)
         }
       }
 
