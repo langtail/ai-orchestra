@@ -194,6 +194,9 @@ export function createOrchestra<TContext>() {
             if (params.onFinish) {
               await params.onFinish(finalState)
             }
+
+            // Exit the loop when there is no next state
+            break
           }
 
           currentAgent = String(nextAgent)

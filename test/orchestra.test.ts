@@ -226,4 +226,103 @@ describe('Orchestra', () => {
       },
     })
   })
+
+  it('should properly terminate when there is no next state', async () => {
+    type Context = { steps: number[] }
+
+    const orchestra = createOrchestra<Context>()({
+      first: async (context) => {
+        return {
+          nextState: 'second',
+          context: { steps: [...context.steps, 1] },
+        }
+      },
+      second: async (context) => {
+        return {
+          nextState: 'third',
+          context: { steps: [...context.steps, 2] },
+        }
+      },
+      third: async (context) => {
+        // No nextState here - should terminate
+        return {
+          context: { steps: [...context.steps, 3] },
+        }
+      },
+    })
+
+    const run = orchestra.createRun({
+      agent: 'first',
+      context: { steps: [] },
+    })
+
+    const events: any[] = []
+    for await (const event of run.events) {
+      events.push(event)
+    }
+
+    // Verify we get the correct number of events
+    // 6 events: 3 state transitions, 2 state transitions with 'to', 1 completion
+    expect(events).toHaveLength(6)
+
+    // Verify the sequence of events
+    expect(events[0]).toMatchObject({
+      event: 'on_state_transition',
+      from: 'first',
+    })
+    expect(events[1]).toMatchObject({
+      event: 'on_state_transition',
+      from: 'first',
+      to: 'second',
+    })
+    expect(events[2]).toMatchObject({
+      event: 'on_state_transition',
+      from: 'second',
+    })
+    expect(events[3]).toMatchObject({
+      event: 'on_state_transition',
+      from: 'second',
+      to: 'third',
+    })
+    expect(events[4]).toMatchObject({
+      event: 'on_state_transition',
+      from: 'third',
+    })
+    expect(events[5]).toMatchObject({
+      event: 'on_state_completion',
+      state: 'third',
+      context: { steps: [1, 2, 3] },
+    })
+
+    // Verify history
+    expect(run.history).toHaveLength(4) // Initial + 3 states
+    expect(run.history[run.history.length - 1].context).toMatchObject({
+      steps: [1, 2, 3],
+    })
+  })
+
+  it('should not throw "Agent undefined not found" when state has no next state', async () => {
+    type Context = { value: string }
+
+    const orchestra = createOrchestra<Context>()({
+      start: async (context) => {
+        // No nextState - should cleanly terminate
+        return {
+          context: { value: 'done' },
+        }
+      },
+    })
+
+    const run = orchestra.createRun({
+      agent: 'start',
+      context: { value: '' },
+    })
+
+    // This should complete without throwing any error
+    await expect(async () => {
+      for await (const event of run.events) {
+        // Just consume events
+      }
+    }).not.toThrow('Agent "undefined" not found')
+  })
 })
