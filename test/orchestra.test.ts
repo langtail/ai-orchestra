@@ -325,4 +325,99 @@ describe('Orchestra', () => {
       }
     }).not.toThrow('Agent "undefined" not found')
   })
+
+  it('should stream chunks immediately without waiting for tool execution', async () => {
+    // Track when chunks are received
+    const chunkTimestamps: number[] = []
+    const toolCallTimestamps: number[] = []
+
+    const startTime = Date.now()
+
+    const mockStream = {
+      finishReason: Promise.resolve('tool_calls'),
+      toolCalls: (async () => {
+        // Simulate slow tool call resolution
+        await new Promise((resolve) => setTimeout(resolve, 1000))
+        toolCallTimestamps.push(Date.now() - startTime)
+        return [{ id: '1', name: 'slowTool' }]
+      })(),
+      response: Promise.resolve({ messages: [] }),
+      fullStream: simulateReadableStream({
+        chunks: [
+          { type: 'text-delta', textDelta: 'First chunk' },
+          { type: 'text-delta', textDelta: 'Second chunk' },
+          {
+            type: 'tool-call',
+            toolCallId: '1',
+            toolName: 'slowTool',
+            args: {},
+          },
+        ],
+      }),
+    }
+
+    const dispatch = vi.fn(async (name, chunk) => {
+      chunkTimestamps.push(Date.now() - startTime)
+    })
+
+    await processStream(mockStream, dispatch)
+
+    // Verify that chunks were received immediately
+    expect(chunkTimestamps[0]).toBeLessThan(500) // First chunk should arrive quickly
+    expect(chunkTimestamps[1]).toBeLessThan(500) // Second chunk should arrive quickly
+    expect(chunkTimestamps[2]).toBeLessThan(500) // Tool call chunk should arrive quickly
+
+    // Verify that tool calls were resolved later
+    expect(toolCallTimestamps[0]).toBeGreaterThan(900) // Tool call should resolve after ~1000ms
+
+    // Verify all chunks were dispatched
+    expect(dispatch).toHaveBeenCalledTimes(3)
+  })
+
+  it('should stream events immediately without buffering', async () => {
+    type Context = { value: string }
+    const eventTimestamps: number[] = []
+    const startTime = Date.now()
+
+    const orchestra = createOrchestra<Context>()({
+      start: async (context, dispatch) => {
+        // Dispatch some events
+        await dispatch('ai-sdk-stream-chunk', {
+          type: 'text-delta',
+          textDelta: 'First',
+        })
+        await dispatch('ai-sdk-stream-chunk', {
+          type: 'text-delta',
+          textDelta: 'Second',
+        })
+
+        // Simulate a long running operation
+        await new Promise((resolve) => setTimeout(resolve, 1000))
+
+        await dispatch('ai-sdk-stream-chunk', {
+          type: 'text-delta',
+          textDelta: 'Third',
+        })
+
+        return { context }
+      },
+    })
+
+    const run = orchestra.createRun({
+      agent: 'start',
+      context: { value: '' },
+    })
+
+    for await (const event of run.events) {
+      if (event.event === 'on_custom_event') {
+        eventTimestamps.push(Date.now() - startTime)
+      }
+    }
+
+    // If events are buffered, all timestamps will be after 1000ms
+    // If events are streamed immediately, first two should be before 1000ms
+    expect(eventTimestamps[0]).toBeLessThan(500) // First event should be quick
+    expect(eventTimestamps[1]).toBeLessThan(500) // Second event should be quick
+    expect(eventTimestamps[2]).toBeGreaterThan(900) // Third event after delay
+  })
 })

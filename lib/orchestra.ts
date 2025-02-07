@@ -150,20 +150,63 @@ export function createOrchestra<TContext>() {
             context: currentContext,
           } as StateTransitionEvent<TContext>
 
-          const customEvents: CustomEvent[] = []
+          const eventQueue: CustomEvent[] = []
+          const MAX_QUEUE_SIZE = 1000
+          let waitForEvent: ((value: void) => void) | null = null
+          let timeoutId: ReturnType<typeof setTimeout> | null = null
+
           const dispatch = async (name: string, data: any) => {
-            customEvents.push({
+            if (eventQueue.length >= MAX_QUEUE_SIZE) {
+              console.warn('Event queue full, dropping event:', { name, data })
+              return
+            }
+            const event = {
               event: 'on_custom_event',
               name,
               data,
-            })
+            } as const
+            eventQueue.push(event)
+            if (waitForEvent) {
+              waitForEvent()
+              waitForEvent = null
+            }
           }
 
-          const result = await agent(currentContext, dispatch)
+          // Start the agent in the background
+          const agentPromise = Promise.resolve(agent(currentContext, dispatch))
 
-          for (const event of customEvents) {
-            yield event
+          // Keep yielding events until agent is done and queue is empty
+          let agentDone = false
+          void agentPromise.then(() => {
+            agentDone = true
+          })
+
+          try {
+            while (!agentDone || eventQueue.length > 0) {
+              if (eventQueue.length > 0) {
+                yield eventQueue.shift()!
+              } else {
+                // Wait for next event or timeout
+                if (timeoutId) clearTimeout(timeoutId)
+                await Promise.race([
+                  new Promise<void>((resolve) => {
+                    waitForEvent = resolve
+                  }),
+                  new Promise<void>((resolve) => {
+                    timeoutId = globalThis.setTimeout(() => {
+                      timeoutId = null
+                      resolve()
+                    }, 50)
+                  }),
+                ])
+              }
+            }
+          } finally {
+            if (timeoutId) clearTimeout(timeoutId)
           }
+
+          // Get the final result
+          const result = await agentPromise
 
           currentContext = { ...currentContext, ...result.context }
           const nextAgent = result.nextState as keyof typeof handlers
