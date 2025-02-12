@@ -35,7 +35,7 @@ bun add ai-orchestra
 
 Here's how to use AI Orchestra with the Vercel AI SDK and tool handling:
 
-````typescript
+```typescript
 import { anthropic } from '@ai-sdk/anthropic'
 import { CoreMessage, streamText } from 'ai'
 import { z } from 'zod'
@@ -156,6 +156,7 @@ for await (const event of run.events) {
 
 // Get the final state
 const finalState = run.history[run.history.length - 1]
+```
 
 ## Run Completion Callback
 
@@ -185,7 +186,7 @@ const run = await orchestra.createRun({
     })
   },
 })
-````
+```
 
 The `onFinish` callback receives a `finalState` object containing:
 
